@@ -1,0 +1,59 @@
+# to run define K3S_TOKEN, K3S_VERSION is optional, eg:
+#   K3S_TOKEN=${RANDOM}${RANDOM}${RANDOM} docker-compose up
+
+version: '3'
+
+x-templates:
+  environment:
+    - &x-token
+      K3S_TOKEN=${K3S_TOKEN:-1234567891011}
+  common: &x-common
+    build:
+      context: ./k3s
+      args:
+        - IMAGE=rancher/k3s:${K3S_VERSION:-latest}
+    privileged: true
+    restart: unless-stopped
+    tmpfs:
+    - /run
+    - /var/run
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 65535
+        hard: 65535
+  agent: &x-agent
+    <<: *x-common
+    command: k3s agent
+    environment:
+    - *x-token
+    - K3S_URL=https://server:6443
+
+services:
+  server:
+    <<: *x-common
+    hostname: server-1
+    command: >
+      k3s server --flannel-backend=none --disable-network-policy --disable-kube-proxy
+    environment:
+    - *x-token
+    - K3S_KUBECONFIG_OUTPUT=/output/kubeconfig.yaml
+    - K3S_KUBECONFIG_MODE=666
+    volumes:
+    - k3s-server:/var/lib/rancher/k3s
+    # We mount the manifests directory to add our own deployments
+    - ./k3s/manifests:/var/lib/rancher/k3s/server/manifests/bootstrap
+    # This is just so that we get the kubeconfig file out
+    - .:/output
+    ports:
+    - 6443:6443  # Kubernetes API Server
+    - 80:80      # Ingress controller port 80
+    - 443:443    # Ingress controller port 443
+
+  agent:
+    <<: *x-agent
+    deploy:
+      replicas: 2
+
+volumes:
+  k3s-server: {}
