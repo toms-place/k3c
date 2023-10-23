@@ -1,0 +1,52 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  repo: https://traefik.github.io/charts
+  chart: traefik
+  targetNamespace: traefik-system
+  createNamespace: true
+  valuesContent: |-
+
+    providers:
+      kubernetesIngress:
+        publishedService:
+          enabled: true
+      kubernetesCRD: {}
+
+    podAnnotations:
+      prometheus.io/port: "8082"
+      prometheus.io/scrape: "true"
+    priorityClassName: "system-cluster-critical"
+
+    # this is needed for docker-compose setup
+    nodeSelector:
+      node-role.kubernetes.io/control-plane: "true"
+    tolerations:
+    - key: "CriticalAddonsOnly"
+      operator: "Exists"
+    - key: "node-role.kubernetes.io/control-plane"
+      operator: "Exists"
+      effect: "NoSchedule"
+    - key: "node-role.kubernetes.io/master"
+      operator: "Exists"
+      effect: "NoSchedule"
+    service:
+      ipFamilyPolicy: "PreferDualStack"
+      type: ClusterIP
+
+    ports:
+      web:
+        hostPort: 80
+        forwardedHeaders:
+          enabled: true
+          trustedIPs:
+            - 10.0.0.0/8
+      websecure:
+        hostPort: 443
+        forwardedHeaders:
+          enabled: true
+          trustedIPs:
+            - 10.0.0.0/8

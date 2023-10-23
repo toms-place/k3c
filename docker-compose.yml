@@ -4,6 +4,9 @@
 version: '3'
 
 x-templates:
+  volumes:
+    - &x-volumes
+      k3s-storage:/var/lib/rancher/k3s/storage
   environment:
     - &x-token
       K3S_TOKEN=${K3S_TOKEN:-1234567891011}
@@ -11,7 +14,7 @@ x-templates:
     build:
       context: ./k3s
       args:
-        - IMAGE=rancher/k3s:${K3S_VERSION:-latest}
+        - IMAGE=rancher/k3s:${K3S_VERSION:-v1.28.2-k3s1}
     privileged: true
     restart: unless-stopped
     tmpfs:
@@ -22,24 +25,19 @@ x-templates:
       nofile:
         soft: 65535
         hard: 65535
-  agent: &x-agent
-    <<: *x-common
-    command: k3s agent
-    environment:
-    - *x-token
-    - K3S_URL=https://server:6443
 
 services:
   server:
     <<: *x-common
-    hostname: server-1
+    hostname: server
     command: >
-      k3s server --flannel-backend=none --disable-network-policy --disable-kube-proxy
+      k3s server --with-node-id --flannel-backend=none --disable-network-policy --disable-kube-proxy --disable=local-storage,traefik
     environment:
     - *x-token
     - K3S_KUBECONFIG_OUTPUT=/output/kubeconfig.yaml
     - K3S_KUBECONFIG_MODE=666
     volumes:
+    - *x-volumes
     - k3s-server:/var/lib/rancher/k3s
     # We mount the manifests directory to add our own deployments
     - ./k3s/manifests:/var/lib/rancher/k3s/server/manifests/bootstrap
@@ -51,9 +49,17 @@ services:
     - 443:443    # Ingress controller port 443
 
   agent:
-    <<: *x-agent
+    <<: *x-common
+    hostname: agent
+    command: k3s agent --with-node-id
+    environment:
+    - *x-token
+    - K3S_URL=https://server:6443
+    volumes:
+    - *x-volumes
     deploy:
       replicas: 2
 
 volumes:
   k3s-server: {}
+  k3s-storage: {}

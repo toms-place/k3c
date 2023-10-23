@@ -1,0 +1,59 @@
+---
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: kubernetes-dashboard
+  namespace: kube-system
+spec:
+  repo: https://kubernetes.github.io/dashboard
+  chart: kubernetes-dashboard
+  version: 7.0.0-alpha1
+  valuesContent: |-
+
+    api:
+      containers:
+        args:
+          - --enable-skip-login=true
+          - --disable-settings-authorizer=true
+          - --enable-insecure-login=true
+    app:
+      ingress:
+        enabled: true
+        # annotations:
+        #   "traefik.ingress.kubernetes.io/router.middlewares": kube-system-redirect@kubernetescrd
+        ingressClassName: traefik
+        hosts:
+          - dash.localhost
+    cert-manager:
+      enabled: false
+    nginx:
+      enabled: false
+    metrics-server:
+      enabled: false
+
+# ---
+# # Redirect to https
+# apiVersion: traefik.io/v1alpha1
+# kind: Middleware
+# metadata:
+#   name: redirect
+#   namespace: kube-system
+# spec:
+#   redirectScheme:
+#     scheme: https
+#     permanent: true
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubernetes-dashboard-admin
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: kubernetes-dashboard
+    namespace: kube-system

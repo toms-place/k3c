@@ -5,23 +5,52 @@ metadata:
   name: demo
 
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
-  name: myingress
+  name: demo-pv-claim
   namespace: demo
 spec:
-  rules:
-  - host: demo.localhost
-    http:
-      paths:
-      - pathType: Prefix
-        path: "/"
-        backend:
-          service:
-            name: myapp-svc
-            port: 
-              number: 80
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 3Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+        name: myapp
+        awesome: demo-app
+    spec:
+      containers:
+      - name: nginx
+        image: nginxinc/nginx-unprivileged:latest
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        ports:
+          - containerPort: 8080
+            name: http
+        volumeMounts:
+          - mountPath: "/mnt/storage"
+            name: demo-pv-storage
+      volumes:
+        - name: demo-pv-storage
+          persistentVolumeClaim:
+            claimName: demo-pv-claim
 
 ---
 apiVersion: v1
@@ -40,22 +69,20 @@ spec:
   type: ClusterIP
 
 ---
-apiVersion: v1
-kind: Pod
+apiVersion: networking.k8s.io/v1
+kind: Ingress
 metadata:
-  name: myapp-pod
+  name: myingress
   namespace: demo
-  labels:
-    name: myapp
-    awesome: demo-app
 spec:
-  containers:
-  - name: nginx
-    image: nginxinc/nginx-unprivileged:latest
-    resources:
-      limits:
-        memory: "128Mi"
-        cpu: "500m"
-    ports:
-      - containerPort: 8080
-        name: http
+  rules:
+  - host: demo.localhost
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: myapp-svc
+            port: 
+              number: 80
